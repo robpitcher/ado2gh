@@ -1,0 +1,40 @@
+name: Check Links
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday at 9:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check all links
+        run: python tests/check_links.py
+
+      - name: Create issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Skip if an open issue already exists
+          existing=$(gh issue list --label "broken-links" --state open --json number --jq '.[0].number' 2>/dev/null)
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing already open — skipping."
+            exit 0
+          fi
+
+          gh label create "broken-links" --color "d73a4a" --description "Automated: broken link detected" 2>/dev/null || true
+
+          gh issue create \
+            --title "Broken links detected" \
+            --body "The weekly link check found broken links. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." \
+            --label "broken-links" \
+            --assignee "robpitcher"
