@@ -65,10 +65,13 @@ jobs:
             --jq '.data.repository.suggestedActors.nodes[] | select(.login == "copilot-swe-agent") | .nodeId')
 
           if [ -n "$copilot_node_id" ]; then
-            gh api graphql \
+            if gh api graphql \
               -H "GraphQL-Features: issues_copilot_assignment_api_support" \
-              -f query='mutation { addAssigneesToAssignable(input: { assignableId: "'"$issue_node_id"'", assigneeIds: ["'"$copilot_node_id"'"] }) { assignable { ... on Issue { number } } } }'
-            echo "Assigned Copilot cloud agent to issue #$issue_number"
+              -f query='mutation { addAssigneesToAssignable(input: { assignableId: "'"$issue_node_id"'", assigneeIds: ["'"$copilot_node_id"'"] }) { assignable { ... on Issue { number } } } }' 2>&1; then
+              echo "Assigned Copilot cloud agent to issue #$issue_number"
+            else
+              echo "::warning::Failed to assign Copilot cloud agent to issue #$issue_number (non-fatal)"
+            fi
           else
             echo "::warning::Copilot cloud agent not available for assignment"
           fi
