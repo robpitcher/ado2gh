@@ -27,8 +27,8 @@ def check_url(url):
     for method in ("HEAD", None):
         try:
             req = urllib.request.Request(url, headers=headers, method=method)
-            resp = urllib.request.urlopen(req, timeout=TIMEOUT)
-            return (url, resp.status, None)
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                return (url, resp.status, None)
         except urllib.error.HTTPError as e:
             if method == "HEAD" and e.code == 405:
                 continue
