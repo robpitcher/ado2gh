@@ -18,6 +18,8 @@ jobs:
 
       - name: Check all links
         run: python tests/check_links.py
+        env:
+          LINK_CHECK_REPORT: ${{ runner.temp }}/broken-links.md
 
       - name: Create issue on failure
         if: failure()
@@ -35,6 +37,6 @@ jobs:
 
           gh issue create \
             --title "Broken links detected" \
-            --body "The weekly link check found broken links. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." \
+            --body-file "${{ runner.temp }}/broken-links.md" \
             --label "broken-links" \
             --assignee "robpitcher"

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check all hyperlinks in docs/ markdown files for broken URLs."""
 
+import os
 import re
 import sys
 import urllib.request
@@ -11,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 URL_PATTERN = re.compile(r'https?://[^\s)>\]"]+')
 TIMEOUT = 15
+REPORT_PATH = os.environ.get("LINK_CHECK_REPORT")
 
 
 def extract_urls(filepath):
@@ -72,10 +74,29 @@ def main():
             print(f"  {url}")
             print(f"    Status: {status or 'N/A'} — {error}")
             print(f"    Found in: {', '.join(sources)}\n")
+
+        if REPORT_PATH:
+            write_report(failures)
+
         return 1
 
     print(f"\nAll {len(url_sources)} link(s) OK.")
     return 0
+
+
+def write_report(failures):
+    """Write a markdown-formatted report of broken links."""
+    lines = [
+        f"The weekly link check found **{len(failures)} broken link(s)**.\n",
+        "| URL | Status | Found in |",
+        "|-----|--------|----------|",
+    ]
+    for url, status, error, sources in failures:
+        status_text = str(status) if status else "ERR"
+        sources_text = ", ".join(f"`{s}`" for s in sources)
+        lines.append(f"| {url} | {status_text} | {sources_text} |")
+
+    Path(REPORT_PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
