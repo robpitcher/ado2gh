@@ -33,8 +33,31 @@ jobs:
             exit 0
           fi
 
-          gh issue create \
+          # Create the issue assigned to robpitcher
+          issue_url=$(gh issue create \
             --title "Broken links detected" \
             --body-file "${{ runner.temp }}/broken-links.md" \
             --label "bug" \
-            --assignee "robpitcher"
+            --assignee "robpitcher")
+
+          issue_number=$(echo "$issue_url" | grep -oE '[0-9]+$')
+          echo "Created issue #$issue_number"
+
+          # Assign Copilot cloud agent via GraphQL
+          issue_node_id=$(gh api graphql \
+            -f query='query { repository(owner: "robpitcher", name: "ado2gh") { issue(number: '"$issue_number"') { id } } }' \
+            --jq '.data.repository.issue.id')
+
+          copilot_node_id=$(gh api graphql \
+            -H "GraphQL-Features: issues_copilot_assignment_api_support" \
+            -f query='query { repository(owner: "robpitcher", name: "ado2gh") { suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 10) { nodes { ... on Bot { login nodeId: id } } } } }' \
+            --jq '.data.repository.suggestedActors.nodes[] | select(.login == "copilot-swe-agent") | .nodeId')
+
+          if [ -n "$copilot_node_id" ]; then
+            gh api graphql \
+              -H "GraphQL-Features: issues_copilot_assignment_api_support" \
+              -f query='mutation { addAssigneesToAssignable(input: { assignableId: "'"$issue_node_id"'", assigneeIds: ["'"$copilot_node_id"'"] }) { assignable { ... on Issue { number } } } }'
+            echo "Assigned Copilot cloud agent to issue #$issue_number"
+          else
+            echo "::warning::Copilot cloud agent not available for assignment"
+          fi
