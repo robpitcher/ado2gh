@@ -1,3 +1,8 @@
+---
+layout: default
+title: GitHub for ADO Developers
+---
+
 # GitHub for ADO Developers
 
 > **Audience:** Development teams familiar with Azure DevOps that are adopting GitHub. This guide covers GitHub's organizational model, permissions, environments, Copilot, CI/CD, and how each maps to what you already know from ADO.
