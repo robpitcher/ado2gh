@@ -16,8 +16,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Check all links
-        run: python tests/check_links.py
+        run: python3 tests/check_links.py
         env:
           LINK_CHECK_REPORT: ${{ runner.temp }}/broken-links.md
 
