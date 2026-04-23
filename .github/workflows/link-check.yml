@@ -1,0 +1,74 @@
+name: Check Links
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday at 9:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check all links
+        run: python3 tests/check_links.py
+        env:
+          LINK_CHECK_REPORT: ${{ runner.temp }}/broken-links.md
+
+      - name: Create issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Skip if an open issue already exists
+          if ! existing=$(gh issue list --label "bug" --search "Broken links detected" --state open --json number --jq '.[0].number'); then
+            echo "::error::Failed to check for existing broken links issues."
+            exit 1
+          fi
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing already open — skipping."
+            exit 0
+          fi
+
+          # Create the issue assigned to robpitcher
+          issue_url=$(gh issue create \
+            --title "Broken links detected" \
+            --body-file "${{ runner.temp }}/broken-links.md" \
+            --label "bug" \
+            --assignee "robpitcher")
+
+          issue_number=$(echo "$issue_url" | grep -oE '[0-9]+$')
+          echo "Created issue #$issue_number"
+
+          repo_owner="${GITHUB_REPOSITORY%/*}"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+
+          # Assign Copilot cloud agent via GraphQL
+          issue_node_id=$(gh api graphql \
+            -f query='query { repository(owner: "'"$repo_owner"'", name: "'"$repo_name"'") { issue(number: '"$issue_number"') { id } } }' \
+            --jq '.data.repository.issue.id')
+
+          copilot_node_id=$(gh api graphql \
+            -H "GraphQL-Features: issues_copilot_assignment_api_support" \
+            -f query='query { repository(owner: "'"$repo_owner"'", name: "'"$repo_name"'") { suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 10) { nodes { ... on Bot { login nodeId: id } } } } }' \
+            --jq '.data.repository.suggestedActors.nodes[] | select(.login == "copilot-swe-agent") | .nodeId')
+
+          if [ -n "$copilot_node_id" ]; then
+            gh api graphql \
+              -H "GraphQL-Features: issues_copilot_assignment_api_support" \
+              -f query='mutation { addAssigneesToAssignable(input: { assignableId: "'"$issue_node_id"'", assigneeIds: ["'"$copilot_node_id"'"] }) { assignable { ... on Issue { number } } } }'
+            echo "Assigned Copilot cloud agent to issue #$issue_number"
+          else
+            echo "::warning::Copilot cloud agent not available for assignment"
+          fi
