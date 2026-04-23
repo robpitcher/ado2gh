@@ -84,17 +84,30 @@ def main():
     return 0
 
 
+def escape_markdown_table_cell(value):
+    """Escape markdown table cell content so tables render reliably."""
+    text = str(value)
+    return text.replace("|", r"\|").replace("\r", " ").replace("\n", " ")
+
+
 def write_report(failures):
     """Write a markdown-formatted report of broken links."""
     lines = [
         f"The weekly link check found **{len(failures)} broken link(s)**.\n",
-        "| URL | Status | Found in |",
-        "|-----|--------|----------|",
+        "| URL | Status | Error | Found in |",
+        "|-----|--------|-------|----------|",
     ]
     for url, status, error, sources in failures:
         status_text = str(status) if status else "ERR"
+        error_text = error or "N/A"
         sources_text = ", ".join(f"`{s}`" for s in sources)
-        lines.append(f"| {url} | {status_text} | {sources_text} |")
+        lines.append(
+            "| "
+            f"{escape_markdown_table_cell(url)} | "
+            f"{escape_markdown_table_cell(status_text)} | "
+            f"{escape_markdown_table_cell(error_text)} | "
+            f"{escape_markdown_table_cell(sources_text)} |"
+        )
 
     Path(REPORT_PATH).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
