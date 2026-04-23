@@ -27,7 +27,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Skip if an open issue already exists
-          existing=$(gh issue list --label "bug" --search "Broken links detected" --state open --json number --jq '.[0].number' 2>/dev/null)
+          if ! existing=$(gh issue list --label "bug" --search "Broken links detected" --state open --json number --jq '.[0].number'); then
+            echo "::error::Failed to check for existing broken links issues."
+            exit 1
+          fi
           if [ -n "$existing" ]; then
             echo "Issue #$existing already open — skipping."
             exit 0
